@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import Select
+from collections import Counter
 
 # Configuração do WebDriver
 driver = webdriver.Chrome()
@@ -14,7 +15,8 @@ wait = WebDriverWait(driver, 30)
 
 # Tentar fechar o banner de política de privacidade
 try:
-    privacy_banner = wait.until(EC.visibility_of_element_located((By.XPATH, "//div[contains(@class, 'PrivacyPolicy_PrivacyPolicy__nL9xT')]//button")))
+    privacy_banner = wait.until(EC.visibility_of_element_located(
+        (By.XPATH, "//div[contains(@class, 'PrivacyPolicy_PrivacyPolicy__nL9xT')]//button")))
     if privacy_banner.is_displayed():
         driver.execute_script("arguments[0].click();", privacy_banner)
 except Exception as e:
@@ -22,18 +24,22 @@ except Exception as e:
 
 # Rolando até o elemento para garantir que esteja visível
 try:
-    notebook_div = wait.until(EC.element_to_be_clickable((By.XPATH, "//div[@class='Paper_Paper__4XALQ Paper_Paper__bordered__cl5Rh HotlinkCard_HotlinkCard__YfXNM' and .//p[text()='Notebook']]")))
+    notebook_div = wait.until(EC.element_to_be_clickable((By.XPATH,
+                                                          "//div[@class='Paper_Paper__4XALQ Paper_Paper__bordered__cl5Rh HotlinkCard_HotlinkCard__YfXNM' and .//p[text()='Notebook']]")))
     driver.execute_script("arguments[0].scrollIntoView();", notebook_div)
     driver.execute_script("arguments[0].click();", notebook_div)  # Tenta clicar no elemento
 except Exception as e:
     print(f"Erro ao clicar no elemento Notebook: {e}")
 
+
 # Função para verificar se a página terminou de carregar os notebooks
 def wait_for_notebooks_to_load():
     try:
-        wait.until(EC.presence_of_all_elements_located((By.XPATH, "//h2[contains(@class, 'ProductCard_ProductCard_Name')]")))
+        wait.until(
+            EC.presence_of_all_elements_located((By.XPATH, "//h2[contains(@class, 'ProductCard_ProductCard_Name')]")))
     except Exception as e:
         print(f"Erro ao carregar os notebooks: {e}")
+
 
 # Função para extrair os nomes dos notebooks na página atual
 def get_notebook_names():
@@ -48,20 +54,22 @@ def get_notebook_names():
         print(f"Erro ao extrair nomes dos notebooks. Erro: {e}")
         return []
 
-# seleciona o filtro e retorna os notebooks
+
+# Seleciona o filtro e retorna os notebooks
 def get_notebooks_with_filter(filter_value):
     try:
         select_element = wait.until(EC.presence_of_element_located((By.ID, "orderBy")))
         select = Select(select_element)
         select.select_by_value(filter_value)
         print(f"Filtro '{filter_value}' aplicado.")
-    
+
         return get_notebook_names()
     except Exception as e:
         print(f"Erro ao aplicar o filtro '{filter_value}'. Erro: {e}")
         return []
 
-# navega pelas páginas e coleta os notebooks
+
+# Navega pelas páginas e coleta os notebooks
 def coletar_notebooks_em_multiplas_paginas(filter_value, numero_paginas=3):
     all_notebooks = []
 
@@ -69,13 +77,13 @@ def coletar_notebooks_em_multiplas_paginas(filter_value, numero_paginas=3):
     notebooks_atual = get_notebooks_with_filter(filter_value)
     all_notebooks.extend(notebooks_atual)
 
-    # navega pelas próximas páginas até o número limite definido (numero_paginas)
+    # Navega pelas próximas páginas até o número limite definido (numero_paginas)
     for pagina in range(2, numero_paginas + 1):
         try:
             # Localiza e clica no link da próxima página (baseando no número da página)
-            next_page_link = wait.until(EC.element_to_be_clickable((By.XPATH, f"//a[@class='Paginator_pageLink__l_qQ6' and text()='{pagina}']")))
+            next_page_link = wait.until(EC.element_to_be_clickable(
+                (By.XPATH, f"//a[@class='Paginator_pageLink__l_qQ6' and text()='{pagina}']")))
             driver.execute_script("arguments[0].click();", next_page_link)
-
 
             # Extrai os notebooks da nova página
             notebooks_atual = get_notebook_names()
@@ -86,36 +94,40 @@ def coletar_notebooks_em_multiplas_paginas(filter_value, numero_paginas=3):
 
     return all_notebooks
 
+
 # Gera uma lista HTML a partir dos notebooks encontrados
-def gerar_lista_html(notebooks, filtro):
-    html = f"<h3 class='text-center mt-4'>Notebooks encontrados para o filtro '{filtro}':</h3>\n"
+def gerar_lista_html(notebooks, titulo):
+    html = f"<h3 class='text-center mt-4'>{titulo}</h3>\n"
     html += "<ul class='list-group list-group-flush mb-4'>\n"
     for notebook in notebooks:
         html += f"  <li class='list-group-item'>{notebook}</li>\n"
     html += "</ul>\n"
     return html
 
+
 # Coleta os notebooks em múltiplas páginas para os três filtros
 notebooks_melhor_avaliado = coletar_notebooks_em_multiplas_paginas("rating_desc", numero_paginas=3)  # Melhor avaliado
-notebooks_menor_preco = coletar_notebooks_em_multiplas_paginas("price_asc", numero_paginas=3)        # Menor preço
-notebooks_mais_relevante = coletar_notebooks_em_multiplas_paginas("lowering_percentage_desc", numero_paginas=3)  # Mais relevante
+notebooks_menor_preco = coletar_notebooks_em_multiplas_paginas("price_asc", numero_paginas=3)  # Menor preço
+notebooks_mais_relevante = coletar_notebooks_em_multiplas_paginas("lowering_percentage_desc",
+                                                                  numero_paginas=3)  # Mais relevante
 
-# Gerar uma listas HTML para os notebooks de cada filtro
-html_melhor_avaliado = gerar_lista_html(notebooks_melhor_avaliado, "Melhor avaliado")
-html_menor_preco = gerar_lista_html(notebooks_menor_preco, "Menor preço")
-html_mais_relevante = gerar_lista_html(notebooks_mais_relevante, "Mais relevante")
+# Contabiliza a ocorrência de cada notebook nos três filtros
+all_notebooks_combined = (
+        notebooks_melhor_avaliado + notebooks_menor_preco + notebooks_mais_relevante
+)
+notebook_counts = Counter(all_notebooks_combined)
 
-# Encontrar notebooks que aparecem nos três filtros
-notebooks_comuns = set(notebooks_melhor_avaliado) & set(notebooks_mais_relevante)
+# Filtra apenas os notebooks que aparecem em todos os três filtros
+notebooks_em_todos_filtros = [notebook for notebook, count in notebook_counts.items() if count >= 3]
 
-# Gera uma lista HTML para notebooks comuns
-html_notebooks_comuns = "<h3 class='text-center mt-4'>Notebooks que aparecem nos filtros 'Melhor avaliado' e 'Mais relevante':</h3>\n<ul class='list-group list-group-flush mb-4'>\n"
-if notebooks_comuns:
-    for notebook in notebooks_comuns:
-        html_notebooks_comuns += f"  <li class='list-group-item'>{notebook}</li>\n"
-    html_notebooks_comuns += "</ul>\n"
-else:
-    html_notebooks_comuns += "<li class='list-group-item'>Nenhum notebook foi encontrado em todos os filtros.</li>\n</ul>\n"
+# Seleciona os cinco melhores notebooks (se houver)
+top_notebooks = notebooks_em_todos_filtros[:5]
+
+# Gera listas HTML para os notebooks encontrados em todos os filtros e os cinco melhores
+html_notebooks_melhor_avaliado = gerar_lista_html(notebooks_melhor_avaliado, "Notebooks mais bem avaliados:")
+html_notebooks_menor_preco = gerar_lista_html(notebooks_menor_preco, "Notebooks com menor preço:")
+html_notebooks_mais_relevante = gerar_lista_html(notebooks_mais_relevante, "Notebooks mais relevantes:")
+html_top_notebooks = gerar_lista_html(top_notebooks, "Os 5 melhores notebooks que aparecem em todos os filtros:")
 
 # Adiciona um cabeçalho do Bootstrap ao HTML
 html_header = """
@@ -142,7 +154,7 @@ html_footer = """
 """
 
 # Combina o HTML gerado com cabeçalho e rodapé
-html_final = html_header + html_melhor_avaliado + html_menor_preco + html_mais_relevante + html_notebooks_comuns + html_footer
+html_final = html_header + html_notebooks_melhor_avaliado + html_notebooks_menor_preco + html_notebooks_mais_relevante + html_top_notebooks + html_footer
 
 # Salva em arquivo HTML
 file_path = "notebooks.html"
